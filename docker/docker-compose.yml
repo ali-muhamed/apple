@@ -1,0 +1,116 @@
+version: '3.4'
+
+### NETWORKS #######################
+networks:
+  default:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: ${PREFIX_SUBNET:-175.23.0.}${SUBNET:-0/24}
+
+### VOLUMES ########################
+volumes:
+  mysql_data:
+  frontend_assets: # Именованый том для хранения ресурсов
+  backend_assets: # Именованый том для хранения ресурсов админк
+
+### SERVICES #######################
+services:
+  ### NGINX ########################
+  nginx:
+    container_name: ${COMPOSE_PROJECT_NAME:-apple}_${NGINX_CONTAINER_NAME:-nginx}
+    build:
+      context: ./nginx
+      args:
+        - NGINX_TAG_VERSION=${NGINX_TAG_VERSION}
+    volumes:
+      - "${APP:-../}:/app/:ro"
+      - frontend_assets:/app/frontend/web/assets/
+      - backend_assets:/app/backend/web/assets/
+      - ${NGINX_LOGS_PATH}:/var/log/nginx/
+    environment:
+      - TZ=${TZ:-Europe/Moscow}
+      - VIRTUAL_HOST=
+        ${DOMAIN:-apple.local},
+        admin.${DOMAIN:-apple.local}
+      - NGINX_HOST=${DOMAIN:-apple.local}
+    healthcheck:
+      test: ["CMD", "service", "nginx", "status"]
+      interval: 1m30s
+      timeout: 10s
+      retries: 5
+      start_period: 50s
+    restart: always
+    networks:
+      default:
+        ipv4_address: ${PREFIX_SUBNET}${NGINX_HOST:-21}
+### PHP ##########################
+  php:
+    container_name: ${COMPOSE_PROJECT_NAME:-apple}_${PHP_CONTAINER_NAME:-php}
+    build:
+      context: ./php7-fpm
+      args:
+        - PHP_TAG_VERSION=${PHP_TAG_VERSION}
+    volumes:
+      - ${APP:-../}:/app
+      - ${PHP_LOGS_PATH}:/var/log
+      - frontend_assets:/app/frontend/web/assets/
+      - backend_assets:/app/backend/web/assets/
+    environment:
+      - TZ=${TZ:-Europe/Moscow}
+      - PHP_ENABLE_XDEBUG=${PHP_ENABLE_XDEBUG:-1}
+      - PHP_INI_CUSTOM_CONFIG=${PHP_INI_CUSTOM_CONFIG}
+      - YII_DEBUG=${YII_DEBUG:-1}
+      - YII_ENV_DEV=${YII_ENV_DEV:-1}
+      - XDEBUG_REMOTE_ENABLE=${XDEBUG_REMOTE_ENABLE:-1}
+      - XDEBUG_REMOTE_PORT=${XDEBUG_REMOTE_PORT:-9000}
+      - XDEBUG_IDE_KEY=${XDEBUG_IDE_KEY:-PHPSTORM}
+      - XDEBUG_PROFILER_ENABLE_TRIGGER=${XDEBUG_PROFILER_ENABLE_TRIGGER:-1}
+    extra_hosts:
+      - "host.docker.internal:${HOST_DOCKER_INTERNAL}"
+    depends_on:
+      - memcache
+      - mysql
+    restart: always
+    expose:
+      - 9000
+    networks:
+      default:
+        ipv4_address: ${PREFIX_SUBNET}${PHP_HOST:-20}
+### MYSQL ########################
+  mysql:
+    container_name: ${COMPOSE_PROJECT_NAME:-apple}_${MYSQL_CONTAINER_NAME:-mysql}
+    build:
+      context: ./mysql
+      args:
+        - MYSQL_TAG_VERSION=${MYSQL_TAG_VERSION}
+        - MYSQL_DB=${MYSQL_DB}
+        - DUMP_NAME=${DUMP_NAME}
+    volumes:
+      - mysql_data:/var/lib/mysqlql/data
+    environment:
+      - TZ=${TZ:-Europe/Moscow}
+      - MYSQL_USER=${MYSQL_USER:-mysql}
+      - MYSQL_DB=${MYSQL_DB:-apple}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-mysql}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-mysql}
+    restart: always
+    expose:
+      - "${MYSQL_PORT:-3306}"
+    networks:
+      default:
+        ipv4_address: ${PREFIX_SUBNET}${MYSQL_HOST:-22}
+### MEMCACHE #####################
+  memcache:
+    container_name: ${COMPOSE_PROJECT_NAME:-apple}_memcache
+    image: memcached:alpine
+    entrypoint:
+      - memcached
+      - -m
+      - "64"
+    restart: always
+    expose:
+      - 11211
+    networks:
+      default:
