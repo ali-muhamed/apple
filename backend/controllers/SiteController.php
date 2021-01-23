@@ -1,11 +1,14 @@
 <?php
+
 namespace backend\controllers;
 
+use backend\models\LoginFormAdmin;
+use common\models\AppleModel;
 use Yii;
-use yii\web\Controller;
-use yii\filters\VerbFilter;
+use yii\data\ActiveDataProvider;
 use yii\filters\AccessControl;
-use common\models\LoginForm;
+use yii\filters\VerbFilter;
+use yii\web\Controller;
 
 /**
  * Site controller
@@ -22,7 +25,7 @@ class SiteController extends Controller
                 'class' => AccessControl::className(),
                 'rules' => [
                     [
-                        'actions' => ['login', 'error'],
+                        'actions' => ['login', 'error', 'generate', 'delete', 'fall', 'eaten'],
                         'allow' => true,
                     ],
                     [
@@ -60,7 +63,40 @@ class SiteController extends Controller
      */
     public function actionIndex()
     {
-        return $this->render('index');
+        AppleModel::updateRotten();
+        AppleModel::removeEaten();
+
+        $dataProvider = new ActiveDataProvider(
+            [
+                'query' => AppleModel::find(),
+            ]
+        );
+        return $this->render(
+            'index',
+            [
+                'dataProvider' => $dataProvider,
+            ]
+        );
+    }
+
+    /**
+     * Generate homepage.
+     *
+     * @return string
+     */
+    public function actionGenerate()
+    {
+        $random = mt_rand(5, 10);
+        for ($i = 0; $i < $random; $i++) {
+            $newApple = new AppleModel();
+            $newApple->color = AppleModel::$colors[mt_rand(0, 3)];
+            $newApple->status = mt_rand(0, 2);
+            $newApple->created_at = time();
+            $newApple->eaten = mt_rand(0, 99);
+            $newApple->save();
+        }
+
+        $this->redirect('index');
     }
 
     /**
@@ -76,15 +112,18 @@ class SiteController extends Controller
 
         $this->layout = 'blank';
 
-        $model = new LoginForm();
+        $model = new LoginFormAdmin();
         if ($model->load(Yii::$app->request->post()) && $model->login()) {
             return $this->goBack();
         } else {
             $model->password = '';
 
-            return $this->render('login', [
-                'model' => $model,
-            ]);
+            return $this->render(
+                'login',
+                [
+                    'model' => $model,
+                ]
+            );
         }
     }
 
@@ -99,4 +138,35 @@ class SiteController extends Controller
 
         return $this->goHome();
     }
+
+    public function actionDelete($id)
+    {
+        if ($model = AppleModel::find()->andWhere(['id' => $id])->one()) {
+            $model->delete();
+        }
+
+        return $this->redirect(['index']);
+    }
+
+    public function actionFall($id)
+    {
+        if ($model = AppleModel::find()->andWhere(['id' => $id])->one()) {
+            $model->fallen_at = time();
+            $model->update(false, ['fallen_at']);
+        }
+
+        return $this->redirect(['index']);
+    }
+
+    public function actionEaten($id, $val)
+    {
+        if ($val > 0 && $model = AppleModel::find()->andWhere(['id' => $id])->one()) {
+            $model->eaten += (int)$val;
+            $model->eaten > 100 ? $model->eaten = 100 : null;
+            $model->update(false, ['eaten']);
+        }
+
+        return $this->redirect(['index']);
+    }
+
 }

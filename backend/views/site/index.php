@@ -2,52 +2,107 @@
 
 /* @var $this yii\web\View */
 
-$this->title = 'My Yii Application';
+use yii\bootstrap\ActiveForm;
+use yii\grid\GridView;
+use yii\helpers\Html;
+use yii\web\View;
+
+$this->title = 'Apple tree';
 ?>
 <div class="site-index">
-
-    <div class="jumbotron">
-        <h1>Congratulations!</h1>
-
-        <p class="lead">You have successfully created your Yii-powered application.</p>
-
-        <p><a class="btn btn-lg btn-success" href="http://www.yiiframework.com">Get started with Yii</a></p>
+    <?php $form = ActiveForm::begin(); ?>
+    <div>
+        <?= Html::a(
+            'Сгенерировать дерево яблок',
+            '/site/generate',
+            [
+                'class' => 'btn btn-primary'
+            ]
+        ) ?>
     </div>
+    <div>
+        <?php
 
-    <div class="body-content">
-
-        <div class="row">
-            <div class="col-lg-4">
-                <h2>Heading</h2>
-
-                <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et
-                    dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip
-                    ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
-                    fugiat nulla pariatur.</p>
-
-                <p><a class="btn btn-default" href="http://www.yiiframework.com/doc/">Yii Documentation &raquo;</a></p>
-            </div>
-            <div class="col-lg-4">
-                <h2>Heading</h2>
-
-                <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et
-                    dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip
-                    ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
-                    fugiat nulla pariatur.</p>
-
-                <p><a class="btn btn-default" href="http://www.yiiframework.com/forum/">Yii Forum &raquo;</a></p>
-            </div>
-            <div class="col-lg-4">
-                <h2>Heading</h2>
-
-                <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et
-                    dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip
-                    ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
-                    fugiat nulla pariatur.</p>
-
-                <p><a class="btn btn-default" href="http://www.yiiframework.com/extensions/">Yii Extensions &raquo;</a></p>
-            </div>
-        </div>
-
+        echo GridView::widget(
+            [
+                'dataProvider' => $dataProvider,
+                'summary' => '',
+                'columns' => [
+                    'id',
+                    'color',
+                    'created_at',
+                    'fallen_at',
+                    [
+                        'attribute' => 'status',
+                        'value' => function ($model) {
+                            return \common\models\AppleModel::$statusName[$model->status];
+                        },
+                    ],
+                    'eaten',
+//                        [
+//                            'class' => ActionColumn::className(),
+//                            // you may configure additional properties here
+//                        ],
+                    [
+                        'class' => 'yii\grid\ActionColumn',
+                        'template' => ' {update} {view} {delete}',
+                        'buttons' => [
+                            'update' => function ($url, $model, $key) {
+                                return '<input id="eatenInput' . $key . '" type="text" size="20">' . Html::a(
+                                        '<span class="glyphicon glyphicon-cutlery"></span>',
+                                        'eaten?id=' . $model->id,
+                                        [
+                                            'title' => 'Скушать',
+                                            'id' => 'id="eatenA' . $key . '"',
+                                            'class' => 'eaten-button',
+                                            'subId' => $key
+                                        ]
+                                    );
+                            },
+                            'view' => function ($url, $model, $key) {
+                                return Html::a(
+                                    '<span class="glyphicon glyphicon-download"></span>',
+                                    'fall?id=' . $model->id,
+                                    [
+                                        'title' => 'Fall'
+                                    ]
+                                );
+                            },
+                            'delete' => function ($url, $model, $key) {
+                                return Html::a(
+                                    '<span class="glyphicon glyphicon-trash"></span>',
+                                    'delete?id=' . $model->id,
+                                    [
+                                        'title' => 'Удалить'
+                                    ]
+                                );
+                            },
+                        ],
+                    ],
+                ],
+            ]
+        )
+        ?>
     </div>
+    <?php ActiveForm::end(); ?>
 </div>
+<?php
+
+$js = <<<JS
+        (function(){
+
+            $(document).ready(function() {
+    
+                $(".eaten-button").on("click", function (e) {
+                // e.preventDefault();
+                var id = $(this).attr("subId"),
+                input = $("#eatenInput"+id);
+                $(this).attr("href", $(this).attr("href")+"&val="+input.val())
+                
+                });
+            });
+        })(jQuery);
+JS;
+
+$this->registerJs($js, View::POS_END);
+?>
